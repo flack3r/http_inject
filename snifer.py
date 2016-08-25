@@ -14,6 +14,34 @@ def Filter_handle(packet):
 	IP_h = packet[IP]
 	TCP_h = packet[TCP]
 	
+	#====stage3====
+	### send backward to fin 
+	packet4 = copy.deepcopy(packet)
+	Eth_h3 = packet4[Ether]
+	IP_h3 = packet4[IP]
+	TCP_h3 = packet4[TCP]
+
+	Eth_h3.dst = Eth_h.src;
+	Eth_h3.src = Eth_h.dst;
+	IP_h3.dst = IP_h.src;
+	IP_h3.src = IP_h.dst;
+
+	TCP_h3.seq = TCP_h.ack
+	TCP_h3.ack = TCP_h.seq + len(TCP_h.load)
+	TCP_h3.sport = TCP_h.dport
+	TCP_h3.dport = TCP_h.sport
+	del TCP_h3.load
+	TCP_h3.load = "HTTP/1.1 302 Found \r\nLocation: https://en.wikipedia.org/wiki/HTTP_302 \r\n\r\n\x00"
+
+	PacketToServer = packet4
+	#check sum calc
+	del PacketToServer[IP].chksum
+	del PacketToServer[IP].len
+	del PacketToServer[TCP].chksum
+	PacketToServer.show2()
+	sendp(PacketToServer)
+
+
 	#====stage1====
 	### send "block" to server ###
 	packet2 = copy.deepcopy(packet)
@@ -22,7 +50,7 @@ def Filter_handle(packet):
 	TCP_h1 = packet2[TCP]
 
 	#change tcp to fin packet
-	TCP_h1.flags = 'FA'
+	TCP_h1.flags = 'R'
 	TCP_h1.load = "blocked\r\n"
 	TCP_h1.seq += len(TCP_h.load)
 	
@@ -63,33 +91,6 @@ def Filter_handle(packet):
 	# PacketToServer.show2()
 	# sendp(PacketToServer)
 
-	#====stage3====
-	### send backward to fin 
-	packet4 = copy.deepcopy(packet)
-
-	Eth_h3 = packet4[Ether]
-	IP_h3 = packet4[IP]
-	TCP_h3 = packet4[TCP]
-
-	Eth_h3.dst = Eth_h.src;
-	Eth_h3.src = Eth_h.dst;
-	IP_h3.dst = IP_h.src;
-	IP_h3.src = IP_h.dst;
-
-	TCP_h3.seq = TCP_h.ack
-	TCP_h3.ack = TCP_h.seq + len(TCP_h.load)
-	TCP_h3.sport = TCP_h.dport
-	TCP_h3.dport = TCP_h.sport
-	del TCP_h3.load
-	TCP_h3.load = "HTTP/1.1 302 Found \r\nLocation: https://en.wikipedia.org/wiki/HTTP_302 \r\n\r\n\x00"
-
-	PacketToServer = packet4
-	#check sum calc
-	del PacketToServer[IP].chksum
-	del PacketToServer[IP].len
-	del PacketToServer[TCP].chksum
-	PacketToServer.show2()
-	sendp(PacketToServer)
 	stop_flag = True;
 	del packet
 	return
@@ -101,4 +102,5 @@ def stopfilter(x):
 		return True
 	else:
 		return False
+
 sniff(iface='eth0', prn=Filter_handle, lfilter=lambda p: "GET" in str(p), filter="tcp port 80", store=0)
